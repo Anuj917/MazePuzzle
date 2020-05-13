@@ -3,7 +3,7 @@ from pygame.locals import *
 import sys
 
 
-from Credit import Credit
+# from Credit import Credit
 from Level import Level
 from Player import Player
 from Theme import Theme
@@ -16,32 +16,50 @@ class Screen:
         self.DISPLAYSURF = displaySurf
         self.WINWIDTH = winWidth
         self.WINHEIGHT = winHeight
-        self.credit_instance = Credit(displaySurf,winWidth,winHeight)
+#         self.credit_instance = Credit(displaySurf,winWidth,winHeight)
         self.goalStar = pygame.image.load('Images/Theme/Star.png')
         self.Clock = pygame.time.Clock()
 
         self.TILEWIDTH = 50
         self.TILEHEIGHT = 85
         self.TILEFLOORHEIGHT = 40
+
+        self.GameOver = pygame.mixer.Sound('audio/pew_pew.wav')
          
 
     def starts(self):
         #first display logo for 2 sec(2000 miliseconds)
         self.fullScreenImageDisplay('Images/credit/logo.png',halt=2000)
-    
-    def runLevels(self):
         theme_no,playerSprite_no = self.Selection()
         theme_no,playerSprite_no = self.Selection(theme_no,playerSprite_no,False)
 
+        return theme_no,playerSprite_no
+    
+    def runLevels(self,theme_no,playerSprite_no):
         self.level = Level("level/MazePuzzle.txt")
         no_levels = self.level.levelInfo()[1]
         for i in range(no_levels):
-            self.runLevel(self.level.getCurLevelObj(),theme_no,playerSprite_no)
+            passed = self.runLevel(self.level.getCurLevelObj(),theme_no,playerSprite_no)
+            if passed == False:
+                break
             self.level.gotoNextLevel()
+        
+        #if last level is complete show congratulations
+        if passed:
+            self.fullScreenImageDisplay('Images/Credit/Congratulations.png',halt=2500,BGCOLOR=None)
+            return True
+        else:
+            self.fullScreenImageDisplay('Images/Credit/replay.png',halt=2500,BGCOLOR=None)
+            return False
+
+    
+    def Credits(self):
+        self.fullScreenImageDisplay('Images/credit/END.png',halt=2500)
         self.fullScreenImageDisplay('Images/credit/logo.png',halt=2000)
 
     def fullScreenImageDisplay(self,imagePath,halt=1500,BGCOLOR=(255,255,255)):
-        self.DISPLAYSURF.fill(BGCOLOR)
+        if BGCOLOR !=None:
+            self.DISPLAYSURF.fill(BGCOLOR)
         xImg1 = pygame.image.load(imagePath)
         xImg = xImg1.get_rect()
         xImg.centerx = int(self.WINWIDTH/2)
@@ -49,6 +67,58 @@ class Screen:
         self.DISPLAYSURF.blit(xImg1,xImg)
         pygame.display.update()
         pygame.time.wait(halt)
+
+    def story(self,playerSprite_no,story,BGCOLOR=(0,170,255),speed=250,waitKey=True):
+        
+        self.DISPLAYSURF.fill(BGCOLOR)
+        playerSprite = list(Player.CharacterSprites.values())[playerSprite_no]
+        
+        playerSprite = pygame.transform.scale(playerSprite,(150,150))
+
+        playerSprite1 = playerSprite.get_rect()
+        playerSprite1.centerx = int(self.WINWIDTH/2)
+        playerSprite1.centery = int(self.WINHEIGHT/2)
+
+
+        self.DISPLAYSURF.blit(playerSprite,playerSprite1)
+
+        
+        boxImg = pygame.image.load('Images/dialogue/box150.png')
+        boxImg1 = boxImg.get_rect()
+        boxImg1.bottomleft = (0,self.WINHEIGHT)
+        #self.DISPLAYSURF.blit(boxImg,boxImg1)
+        pygame.display.update()
+
+        
+        Font = Theme.getStoryFont()
+        for i in story:
+            Sentence = ""
+            for j in i.split(' '):
+                Sentence = Sentence + ' '+j
+                self.DISPLAYSURF.blit(boxImg,boxImg1)
+                line = Font.render(Sentence,1,(255,255,0))
+                lineRect = line.get_rect()
+                lineRect.center = (int(self.WINWIDTH/2),self.WINHEIGHT-75)
+                self.DISPLAYSURF.blit(line,lineRect)
+                pygame.time.wait(speed)
+                pygame.display.update()
+            if waitKey:
+                _ = self.waitKeyPressed()
+                
+
+
+
+
+    def waitKeyPressed(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == KEYDOWN:
+                    return event.key
+        return None
+
 
     def Selection(self,theme_no=0,playerSprite_no=0,themeSelect = True):
         themelevel = Level("level/themeLevel.txt")
@@ -59,12 +129,24 @@ class Screen:
         Font = Theme.getTitleFont()
 
         if themeSelect:
-            themeText = Font.render('Select Theme',1,(255,255,255))
+            themeText = Font.render('Select Theme',1,(25,25,25))
         else:
-            themeText = Font.render('Select Character',1,(255,255,255))
+            themeText = Font.render('Select Character',1,(25,25,25))
         themeTextRect = themeText.get_rect()
         themeTextRect.center = (self.WINWIDTH/2,90)
         self.DISPLAYSURF.blit(themeText,themeTextRect)
+        
+        Font2 = Theme.getInfoFont()
+        #text below selection
+        belowText = Font2.render('<<- use Arrow keys to change ->>',1,(0,0,0))
+        belowTextRect = belowText.get_rect()
+        belowTextRect.center = (self.WINWIDTH/2,self.WINHEIGHT-150)
+        self.DISPLAYSURF.blit(belowText,belowTextRect)
+
+        belowText2 = Font2.render('[Press Enter to select]',1,(0,0,0))
+        belowTextRect2 = belowText2.get_rect()
+        belowTextRect2.center = (self.WINWIDTH/2,self.WINHEIGHT-120)
+        self.DISPLAYSURF.blit(belowText2,belowTextRect2)
 
         mapSurfRect = mapSurf.get_rect()
         mapSurfRect.center = (self.WINWIDTH/2,self.WINHEIGHT/2)
@@ -119,7 +201,7 @@ class Screen:
 
         #initialize all current level ghosts with speeds
         cur_ghosts = []
-        print(levelObj['Ghosts'])
+        
         for i in levelObj['Ghosts']:
             if i['type'] == 'V':
                 tmpGhost = Ghost(i,1.0,len(levelObj['map']))
@@ -143,9 +225,9 @@ class Screen:
         mapSurfRect.center = (self.WINWIDTH/2,self.WINHEIGHT/2)
         self.DISPLAYSURF.blit(mapSurf,mapSurfRect)
         pygame.display.update()
-        
+        self.Clock.tick()
         time_passed = 0.0
-
+        levelPass = True
         #main game loop for level
         while not LevelCompleted:
             Move = None
@@ -183,6 +265,10 @@ class Screen:
                 mvd,pos = ghst.Haunt(timeSec)
                 ghstSprite = ghst.getSprite()
                 mapSurf = self.drawCharacter(mapSurf,ghstSprite,pos)
+                if pos == list(levelObj['Start']):
+                    LevelCompleted = True
+                    levelPass = False
+                    self.GameOver.play()
 
 
 
@@ -208,7 +294,7 @@ class Screen:
             pygame.display.update()
 
             time_passed += self.Clock.tick()
-            
+        return levelPass
     
     def drawCharacter(self,mapSurf,characterSprite,position):
         i,j = position
